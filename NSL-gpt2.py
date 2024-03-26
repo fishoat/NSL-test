@@ -14,7 +14,8 @@ def gelu(x):
         Input: Tensor
         Output: Tensor
     """
-    pass
+    reslutofgelu=0.5*x*(1+torch.nn.tanh(math.pow(2/math.pi,0.5)*(x+0.044715*x*x*x)))
+    return reslutofgelu
 
 
 def softmax(x):
@@ -23,8 +24,8 @@ def softmax(x):
         Input: Tensor
         Output: Tensor
     """
-    pass
-
+    resultofsoftmax=torch.nn.functional.softmax(x)
+    return resultofsoftmax
 
 def layer_norm(x, g_b, eps:float = 1e-5):
     """
@@ -76,7 +77,11 @@ def attention(q, k, v, mask):  # [n_q, d_k], [n_k, d_k], [n_k, d_v], [n_q, n_k] 
             mlp: dictionary that load from gpt2 weight. w_b1 and w_b2 are the params of two linear layer
         Output: Tensor
     """
-    pass
+    kt=torch.transpose(k)
+    x=torch.mm(q,kt)/(k.size(-1))
+    softx=softmax(x)
+    resultofattention=torch.mm(softx,v)
+    return resultofattention
 
 def mha(x, attn, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
     """
@@ -97,7 +102,7 @@ def mha(x, attn, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
         Task: Split the q,k,v matrix from the tensor x
         Notes: [n_seq, 3*n_embd] -> 3 * [n_seq, n_embd]
     """
-    qkv = None # need to modify
+    qkv = torch.split(x,x.size(-1)) # need to modify
 
     # Split into heads
     qkv_heads = [qkv_part.chunk(n_head, dim=-1) for qkv_part in qkv]  # 3 * [n_seq, n_embd] -> 3 * n_head * [n_seq, n_embd/n_head]
@@ -114,8 +119,9 @@ def mha(x, attn, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
             | 0    0    0  ...   0  |
         Mask is a tensor whose dimension is [n_seq, n_seq]
     """
-    causal_mask = None # need to modify
-
+    n_seq=x.size(0)
+    causal_mask = Ntorch.zeros((n_seq, n_seq)) # need to modify
+    causal_mask.triu_(diagonal=1, fill_=float('-inf'))
     # Perform attention over each head
     out_heads = [attention(q, k, v, causal_mask) for q, k, v in qkv_heads]  # n_head * [n_seq, n_embd/n_head]
     
@@ -124,7 +130,7 @@ def mha(x, attn, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
         Task: merge multi-heads results
         Notes: n_head * [n_seq, n_embd/n_head] --> [n_seq, n_embd]
     """
-    x = None # need to modify
+    x = torch.cat(out_heads,1) # need to modify
     
     # Out projection
     x = linear(x, c_proj)  # [n_seq, n_embd] -> [n_seq, n_embd]
