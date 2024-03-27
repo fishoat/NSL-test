@@ -102,7 +102,7 @@ def mha(x, attn, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
         Task: Split the q,k,v matrix from the tensor x
         Notes: [n_seq, 3*n_embd] -> 3 * [n_seq, n_embd]
     """
-    q,k,v = torch.split(x,x.size(-1)) # need to modify
+    qkv = torch.chunk(x,3,dim=-1) # need to modify
 
     # Split into heads
     qkv_heads = [qkv_part.chunk(n_head, dim=-1) for qkv_part in qkv]  # 3 * [n_seq, n_embd] -> 3 * n_head * [n_seq, n_embd/n_head]
