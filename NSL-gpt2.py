@@ -36,8 +36,9 @@ def layer_norm(x, g_b, eps:float = 1e-5):
         Output: Tensor
     """
     g, b = torch.Tensor(g_b['g']), torch.Tensor(g_b['b'])
-    
-    pass
+    mean = x.mean(dim=-1, keepdim=True)
+    std = x.std(dim=-1, keepdim=True)
+    return g * (x - mean) / (std + eps) + b
 
 def linear(x, w_b):  # [m, in], [in, out], [out] -> [m, out]
     """
@@ -48,7 +49,7 @@ def linear(x, w_b):  # [m, in], [in, out], [out] -> [m, out]
         Output: Tensor
     """
     w, b = w_b['w'], w_b['b']
-    pass
+    return torch.matmul(x, w) + b
     
 
 def ffn(x, mlp):  # [n_seq, n_embd] -> [n_seq, n_embd]
@@ -61,7 +62,7 @@ def ffn(x, mlp):  # [n_seq, n_embd] -> [n_seq, n_embd]
         Output: Tensor
     """
     w_b1, w_b2 = mlp['c_fc'], mlp['c_proj']
-    pass
+    return linear(gelu(linear(x, w_b1)), w_b2)
 
 
 def attention(q, k, v, mask):  # [n_q, d_k], [n_k, d_k], [n_k, d_v], [n_q, n_k] -> [n_q, d_v]
