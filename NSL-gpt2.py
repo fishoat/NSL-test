@@ -14,7 +14,11 @@ def gelu(x):
         Input: Tensor
         Output: Tensor
     """
-    reslutofgelu=0.5*x*(1+torch.nn.tanh(math.pow(2/math.pi,0.5)*(x+0.044715*x*x*x)))
+    x1=math.pow(2/math.pi,0.5)
+    x2=x1**(x+0.044715*x*x*x)
+    tanh=torch.nn.Tanh()
+    x3=tanh(x2)
+    reslutofgelu=0.5*x*(1+x3)
     return reslutofgelu
 
 
@@ -24,7 +28,7 @@ def softmax(x):
         Input: Tensor
         Output: Tensor
     """
-    resultofsoftmax=torch.nn.functional.softmax(x)
+    resultofsoftmax=torch.nn.functional.softmax(x,dim=0)
     return resultofsoftmax
 
 def layer_norm(x, g_b, eps:float = 1e-5):
@@ -48,7 +52,7 @@ def linear(x, w_b):  # [m, in], [in, out], [out] -> [m, out]
             w_b: dictionary that load from gpt2 weight. w-weight and b-bias are the keys
         Output: Tensor
     """
-    w, b = w_b['w'], w_b['b']
+    w, b = torch.Tensor(w_b['w']), torch.Tensor(w_b['b'])
     return torch.matmul(x, w) + b
     
 
@@ -78,7 +82,7 @@ def attention(q, k, v, mask):  # [n_q, d_k], [n_k, d_k], [n_k, d_v], [n_q, n_k] 
             mlp: dictionary that load from gpt2 weight. w_b1 and w_b2 are the params of two linear layer
         Output: Tensor
     """
-    kt=torch.transpose(k)
+    kt=torch.transpose(k,-2,-1)
     x=torch.mm(q,kt)/(k.size(-1))
     softx=softmax(x)
     resultofattention=torch.mm(softx,v)
@@ -121,8 +125,7 @@ def mha(x, attn, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
         Mask is a tensor whose dimension is [n_seq, n_seq]
     """
     n_seq=x.size(0)
-    causal_mask = Ntorch.zeros((n_seq, n_seq)) # need to modify
-    causal_mask.triu_(diagonal=1, fill_=float('-inf'))
+    causal_mask = torch.triu(torch.full((n_seq, n_seq), float('-inf')), diagonal=1) # need to modify
     # Perform attention over each head
     out_heads = [attention(q, k, v, causal_mask) for q, k, v in qkv_heads]  # n_head * [n_seq, n_embd/n_head]
     
