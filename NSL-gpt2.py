@@ -5,22 +5,14 @@ torch.set_printoptions(8)
 
 def gelu(x):
     """
-        Task: Use the torch API to implement the approximate calculation formula of the `GELU`
-        activation function. The formula is as follows (you need to paste it into the latex
-        online conversion website)
-        Website: https://www.latexlive.com/
-        Formula: \frac{1}{2} x\left[1+\tanh \left(\sqrt{\frac{2}{\pi}}\left(x+0.044715 x^{3}\right)\right)\right]
-        
-        Input: Tensor
-        Output: Tensor
-    """
-    x1=math.pow(2/math.pi,0.5)
-    x2=x1**(x+0.044715*x*x*x)
-    tanh=torch.nn.Tanh()
-    x3=tanh(x2)
-    reslutofgelu=0.5*x*(1+x3)
-    return reslutofgelu
+    Task: Use the torch API to implement the approximate calculation formula of the `GELU`
+    activation function.
+    Formula: \frac{1}{2} x\left[1+\tanh \left(\sqrt{\frac{2}{\pi}}\left(x+0.044715 x^{3}\right)\right)\right]
 
+    Input: Tensor
+    Output: Tensor
+    """
+    return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * x ** 3)))
 
 def softmax(x):
     """
@@ -28,8 +20,7 @@ def softmax(x):
         Input: Tensor
         Output: Tensor
     """
-    resultofsoftmax=torch.nn.functional.softmax(x,dim=0)
-    return resultofsoftmax
+    return torch.nn.functional.softmax(x, dim=-1)
 
 def layer_norm(x, g_b, eps:float = 1e-5):
     """
@@ -39,9 +30,10 @@ def layer_norm(x, g_b, eps:float = 1e-5):
             g_b: dictionary that load from gpt2 weight. g-gamma and b-bias are the keys
         Output: Tensor
     """
-    g, b = torch.Tensor(g_b['g']), torch.Tensor(g_b['b'])
-    mean = x.mean(dim=-1, keepdim=True)
-    std = x.std(dim=-1, keepdim=True)
+    g = torch.Tensor(g_b['g'])
+    b = torch.Tensor(g_b['b'])
+    mean = x.mean(-1, keepdim=True)
+    std = x.std(-1, keepdim=True, unbiased=False)
     return g * (x - mean) / (std + eps) + b
 
 def linear(x, w_b):  # [m, in], [in, out], [out] -> [m, out]
@@ -52,9 +44,9 @@ def linear(x, w_b):  # [m, in], [in, out], [out] -> [m, out]
             w_b: dictionary that load from gpt2 weight. w-weight and b-bias are the keys
         Output: Tensor
     """
-    w, b = torch.Tensor(w_b['w']), torch.Tensor(w_b['b'])
+    w = torch.Tensor(w_b['w'])
+    b = torch.Tensor(w_b['b'])
     return torch.matmul(x, w) + b
-    
 
 def ffn(x, mlp):  # [n_seq, n_embd] -> [n_seq, n_embd]
     """
@@ -65,9 +57,9 @@ def ffn(x, mlp):  # [n_seq, n_embd] -> [n_seq, n_embd]
             mlp: dictionary that load from gpt2 weight. w_b1 and w_b2 are the params of two linear layer
         Output: Tensor
     """
-    w_b1, w_b2 = mlp['c_fc'], mlp['c_proj']
+    w_b1 = mlp['c_fc']
+    w_b2 = mlp['c_proj']
     return linear(gelu(linear(x, w_b1)), w_b2)
-
 
 def attention(q, k, v, mask):  # [n_q, d_k], [n_k, d_k], [n_k, d_v], [n_q, n_k] -> [n_q, d_v]
     """
@@ -82,11 +74,15 @@ def attention(q, k, v, mask):  # [n_q, d_k], [n_k, d_k], [n_k, d_v], [n_q, n_k] 
             mlp: dictionary that load from gpt2 weight. w_b1 and w_b2 are the params of two linear layer
         Output: Tensor
     """
-    kt=torch.transpose(k,-2,-1)
-    x=torch.mm(q,kt)/(k.size(-1))
-    softx=softmax(x)
-    resultofattention=torch.mm(softx,v)
-    return resultofattention
+    d_k = q.size(-1)
+    scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(d_k)
+    if mask is not None:
+        scores += mask
+    attention_weights = torch.nn.functional.softmax(scores, dim=-1)
+    return torch.matmul(attention_weights, v)
+
+
+
 
 def mha(x, attn, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
     """
@@ -142,6 +138,8 @@ def mha(x, attn, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
     return x
 
 
+
+
 def transformer_block(x, block, n_head):  # [n_seq, n_embd] -> [n_seq, n_embd]
     mlp, attn, ln_1, ln_2 = block['mlp'], block['attn'], block['ln_1'], block['ln_2']
     
@@ -180,7 +178,7 @@ def generate(inputs, params, n_head, n_tokens_to_generate):
     return inputs[len(inputs) - n_tokens_to_generate :]  # only return generated ids
 
 
-def main(prompt: str, n_tokens_to_generate: int = 5, model_size: str = "124M", models_dir: str = "models"):
+def main(prompt: str, n_tokens_to_generate: int = 50, model_size: str = "124M", models_dir: str = "models"):
     from utils import load_encoder_hparams_and_params
 
     # load encoder, hparams, and params from the released open-ai gpt-2 files
